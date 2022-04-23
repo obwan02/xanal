@@ -1,0 +1,8 @@
+# Ignore rurst fmt backup files
+**/*.rs.bk
+
+# Ignore MSVC deubgging information
+*.pdb
+
+# Ignore compiled stuff
+/target
