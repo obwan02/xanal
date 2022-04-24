@@ -1,14 +1,19 @@
 use clap::{ArgGroup, Parser};
-use flexi_logger::LoggerHandle;
 use log::{error, info, warn};
 use std::{
     fs::{File, OpenOptions},
     io::{stdin, Read, Write},
-    process::exit,
+    fmt::Display,
 };
 
-mod kl_anal;
+#[cfg(not(test))]
+use std::process;
+
 mod key_guess;
+mod kl_anal;
+
+#[cfg(test)]
+mod lib_test;
 
 #[derive(Parser, Debug)]
 #[clap(author = "Oliver W. (obwan02)", version, about = "An Xor ANALyser for cryptanalysis", long_about = None)]
@@ -118,6 +123,16 @@ pub struct Config {
     pub key_length_only: bool,
 }
 
+#[cfg(test)]
+pub fn exit(_: i32, message: impl Display) {
+    panic!("{}", message);
+}
+
+#[cfg(not(test))]
+pub fn exit(code: i32, _: impl Display) {
+    process::exit(code);
+}
+
 pub fn decrypt<'a>(data: &'a [u8], key: &'a [u8]) -> impl Iterator<Item = u8> + 'a {
     data.iter()
         .enumerate()
@@ -130,7 +145,7 @@ fn read_input(config: &Config) -> Vec<u8> {
     if config.file == "-" {
         if let Err(e) = stdin().lock().read_to_end(&mut buf) {
             error!("Failed to read from stdin because '{}'", e);
-            exit(-1);
+            exit(-1, format!("Failed to read from stdin because '{}'", e));
         }
 
         return buf;
@@ -140,23 +155,23 @@ fn read_input(config: &Config) -> Vec<u8> {
         Ok(mut file) => {
             if let Err(e) = file.read_to_end(&mut buf) {
                 error!("Failed to read file '{}' because '{}'", &config.file, e);
-                exit(-1);
+                exit(-1, format!("Failed to read file '{}' because '{}'", &config.file, e));
             }
         }
         Err(e) => {
             error!("Failed to open file '{}' because '{}'", &config.file, e);
-            exit(-1);
+            exit(-1, format!("Failed to open file '{}' because '{}'", &config.file, e));
         }
     }
 
     buf
 }
 
-pub fn run(config: Config, mut logger: LoggerHandle) {
+pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) {
     use key_guess::*;
 
     if config.verbose {
-        logger.parse_new_spec("debug").unwrap();
+        enable_verbose();
     }
 
     let data = read_input(&config);
@@ -170,27 +185,28 @@ pub fn run(config: Config, mut logger: LoggerHandle) {
         x
     };
 
-    if data.len() / key_length < 26 {
-        warn!("The selected key length probably does not give enough data to analyse");
-    }
-
     if config.key_length_only {
         return;
     }
 
-    let method = match (&config.crib, &config.crib_offset) {
-        (Some(crib), Some(offset)) => {
-            info!(
-                "Using crib: '{}', which has length {}",
-                crib,
-                crib.as_bytes().len()
-            );
-            GuessMethod::Crib(crib.as_bytes(), *offset)
+    let method = match (&config.crib, &config.crib_offset, &config.crib_search) {
+        (Some(crib), Some(offset), None) => GuessMethod::Crib(crib.as_bytes(), *offset),
+        (Some(crib), None, Some(search)) => {
+            GuessMethod::CribAndSearch(crib.as_bytes(), search.as_bytes())
         }
-        (Some(_), None) => panic!("Only one crib option given"),
-        (None, Some(_)) => panic!("Only one crib option given"),
-        _ => GuessMethod::MostCommon(config.most_common_byte),
+        (Some(_), Some(_), Some(_)) => unreachable!(),
+        (Some(_), ..) => unreachable!(),
+        (None, None, None) => GuessMethod::MostCommon(config.most_common_byte),
+        (None, ..) => unreachable!(),
     };
+
+    // We need to warn users about using the most common method with very few data points.
+    // This is because frequency analysis isn't very effective with much data. I choose the warning
+    // point as 30 characters because everybody always says 30 is a good sample size (it also is
+    // probably a bare minimum in case of frequency analysis because the range of .
+    if matches!(method, GuessMethod::MostCommon(..)) && data.len() / key_length < 30 {
+        warn!("The selected key length probably does not give enough data to analyse");
+    }
 
     let key_guess = guess_key(&data, key_length, method);
 
@@ -212,11 +228,11 @@ pub fn run(config: Config, mut logger: LoggerHandle) {
         let data: Vec<u8> = decrypt(&data, &key_guess).collect();
 
         match options.open(output_file) {
-            Ok(mut file) => { 
+            Ok(mut file) => {
                 if let Err(e) = file.write(&data) {
                     error!("Failed to write to output file: {}", e);
                 }
-            },
+            }
             Err(e) => error!("Failed to open output file: {}", e),
         };
     }

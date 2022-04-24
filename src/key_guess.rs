@@ -1,6 +1,7 @@
-use simple_error::{SimpleError, simple_error};
-use log::debug;
+
 use crate::decrypt;
+use log::debug;
+use simple_error::{simple_error, SimpleError};
 
 pub enum GuessMethod<'a, 'b> {
     MostCommon(u8),
@@ -43,7 +44,7 @@ impl<'a, 'b> GuessMethod<'a, 'b> {
             CribAndSearch(crib, search) => {
                 let limit = data.len() - crib.len();
                 for offset in 0..limit {
-                    let key_guess: Vec<u8> = data
+                    let mut key_guess: Vec<u8> = data
                         .iter()
                         .skip(offset)
                         .take(key_length)
@@ -51,12 +52,14 @@ impl<'a, 'b> GuessMethod<'a, 'b> {
                         .map(|(i, &x)| x ^ crib[i])
                         .collect();
 
+                    key_guess.rotate_right(offset % key_length);
+                    
                     let data_test = decrypt(data, &key_guess);
+
                     let mut success = false;
                     let mut si = 0;
-                    for (i, x) in data_test.enumerate() {
-                        let val = x ^ key_guess[i % key_guess.len()];
-                        if val == search[si] {
+                    for x in data_test {
+                        if x == search[si] {
                             si += 1;
                         } else {
                             si = 0;
@@ -64,6 +67,7 @@ impl<'a, 'b> GuessMethod<'a, 'b> {
 
                         if si == search.len() - 1 {
                             success = true;
+                            break;
                         }
                     }
 

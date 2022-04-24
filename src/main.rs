@@ -32,11 +32,11 @@ fn main() {
         format_func
     };
 
-    let logger = Logger::try_with_str("info")
+    let mut logger = Logger::try_with_str("info")
         .unwrap()
         .format(format)
         .start()
         .unwrap();
 
-    run(config, logger);
+    run(config, || logger.parse_new_spec("debug").unwrap());
 }
