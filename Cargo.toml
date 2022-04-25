@@ -21,3 +21,7 @@ lipsum = "0.8"
 base64 = "0.13"
 hex = "0.4"
 log = "0.4"
+
+[profile.release]
+strip = true
+lto = true

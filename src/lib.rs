@@ -12,11 +12,8 @@ use std::process;
 mod key_guess;
 mod kl_anal;
 
-#[cfg(test)]
-mod lib_test;
-
 #[derive(Parser, Debug)]
-#[clap(author = "Oliver W. (obwan02)", version, about = "An Xor ANALyser for cryptanalysis", long_about = None)]
+#[clap(author = "Oliver W. (obwan02)", version, about, long_about = None)]
 #[clap(group(
             ArgGroup::new("method")
                 .required(true)
