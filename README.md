@@ -12,8 +12,8 @@ An Xor cryptoANALyser written in rust. This is a small project, mainly intended 
 
 ## Version 0.2.0 Checklist
 - [x] Better READEME.md
-- [ ] Loading bar for really long files
-- [ ] Add posibility for multiple different keys to be found
+- [x] Loading bar for really long files
+- [x] Add possibility for multiple different keys to be found
 - [ ] Examples README
 
 ## Version 0.3.0 Checklist ??
@@ -27,6 +27,7 @@ An Xor cryptoANALyser written in rust. This is a small project, mainly intended 
 - [ ] Improve most common byte evaluator
 - [ ] Add likelihood of the key found being correct (analyse difference between two known frequencies)
 - [ ] Examine multiple key length guesses
+- [ ] Make every method function through iterators to allow for large file size
 
 ## Version 1.0.0 Checklist
 - [ ] Better CLI (maybe have different methods of running as subcommands). For example `xanal common <FILE>` and `xanal crib offset <CRIB> <OFFSET> <FILE>` and `xanal crib search <CRIB> <SEARCH> <FILE>`. May have different method in future the previous commands are just examples.

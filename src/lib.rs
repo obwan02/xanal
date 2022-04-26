@@ -1,9 +1,9 @@
 use clap::{ArgGroup, Parser};
 use log::{error, info, warn};
 use std::{
+    fmt::Display,
     fs::{File, OpenOptions},
     io::{stdin, Read, Write},
-    fmt::Display,
 };
 
 #[cfg(not(test))]
@@ -120,6 +120,33 @@ pub struct Config {
     pub key_length_only: bool,
 }
 
+pub struct Context {
+    loading_bar: Option<indicatif::ProgressBar>,
+    key_length: usize,
+}
+
+impl Context {
+    fn new(key_length: usize) -> Self {
+        Context {
+            loading_bar: None,
+            key_length,
+        }
+    }
+
+    fn request_loading_bar(&mut self, len: usize) -> indicatif::ProgressBar {
+        self.loading_bar = Some(indicatif::ProgressBar::new(len as u64));
+        self.loading_bar.as_ref().unwrap().clone()
+    }
+}
+
+impl Drop for Context {
+    fn drop(&mut self) {
+        if let Some(x) = self.loading_bar.as_ref() {
+            x.finish_and_clear();
+        }
+    }
+}
+
 #[cfg(test)]
 pub fn exit(_: i32, message: impl Display) {
     panic!("{}", message);
@@ -152,12 +179,18 @@ fn read_input(config: &Config) -> Vec<u8> {
         Ok(mut file) => {
             if let Err(e) = file.read_to_end(&mut buf) {
                 error!("Failed to read file '{}' because '{}'", &config.file, e);
-                exit(-1, format!("Failed to read file '{}' because '{}'", &config.file, e));
+                exit(
+                    -1,
+                    format!("Failed to read file '{}' because '{}'", &config.file, e),
+                );
             }
         }
         Err(e) => {
             error!("Failed to open file '{}' because '{}'", &config.file, e);
-            exit(-1, format!("Failed to open file '{}' because '{}'", &config.file, e));
+            exit(
+                -1,
+                format!("Failed to open file '{}' because '{}'", &config.file, e),
+            );
         }
     }
 
@@ -186,6 +219,9 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) {
         return;
     }
 
+    // Establish context
+    let mut context = Context::new(key_length);
+
     let method = match (&config.crib, &config.crib_offset, &config.crib_search) {
         (Some(crib), Some(offset), None) => GuessMethod::Crib(crib.as_bytes(), *offset),
         (Some(crib), None, Some(search)) => {
@@ -205,18 +241,21 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) {
         warn!("The selected key length probably does not give enough data to analyse");
     }
 
-    let key_guess = guess_key(&data, key_length, method);
+    let key_guesses = guess_key(&data, method, &mut context);
 
-    if let Ok(guess) = &key_guess {
-        info!("Key Guess: {}", String::from_utf8_lossy(guess));
-        info!("Key Guess (base64): {}", base64::encode(guess));
-        info!("Key Guess (hex): 0x{}", hex::encode(guess));
+    if let Ok(guesses) = &key_guesses {
+        for item in guesses {
+            info!("------------------------------");
+            info!("Key Guess: {}", String::from_utf8_lossy(item));
+            info!("Key Guess (base64): {}", base64::encode(item));
+            info!("Key Guess (hex): 0x{}", hex::encode(item));
+        }
     } else {
-        error!("Error while guessing key: {}", key_guess.unwrap_err());
+        error!("Error while guessing key: {}", key_guesses.unwrap_err());
         return;
     }
 
-    let key_guess = key_guess.unwrap();
+    let key_guess = key_guesses.unwrap().pop().unwrap();
 
     if let Some(output_file) = config.output_file {
         let mut options = OpenOptions::new();

@@ -1,7 +1,11 @@
 
-use crate::decrypt;
+use crate::{decrypt, Context};
 use log::debug;
+use tinyvec::TinyVec;
 use simple_error::{simple_error, SimpleError};
+
+pub const ARRAY_VEC_SIZE: usize = 64;
+pub type ArrVec<T> = TinyVec<[T; ARRAY_VEC_SIZE]>;
 
 pub enum GuessMethod<'a, 'b> {
     MostCommon(u8),
@@ -33,26 +37,31 @@ impl<'a, 'b> GuessMethod<'a, 'b> {
         }
     }
 
-    fn get_key(&self, data: &[u8], key_length: usize) -> Result<Vec<u8>, SimpleError> {
+    fn get_key(&self, data: &[u8], context: &mut Context) -> Result<Vec<ArrVec<u8>>, SimpleError> {
         use GuessMethod::*;
 
-        if let Err(e) = self.is_valid(data, key_length) {
+        if let Err(e) = self.is_valid(data, context.key_length) {
             return Err(e);
         }
 
         match self {
             CribAndSearch(crib, search) => {
                 let limit = data.len() - crib.len();
+
+                // TODO: search for multiple keys so all data has to be searched
+                let progress_bar = context.request_loading_bar(limit);
+                let mut result = Vec::with_capacity(100);
+
                 for offset in 0..limit {
-                    let mut key_guess: Vec<u8> = data
+                    let mut key_guess: ArrVec<u8> = data
                         .iter()
                         .skip(offset)
-                        .take(key_length)
+                        .take(context.key_length)
                         .enumerate()
                         .map(|(i, &x)| x ^ crib[i])
                         .collect();
 
-                    key_guess.rotate_right(offset % key_length);
+                    key_guess.rotate_right(offset % context.key_length);
                     
                     let data_test = decrypt(data, &key_guess);
 
@@ -72,19 +81,26 @@ impl<'a, 'b> GuessMethod<'a, 'b> {
                     }
 
                     if success {
-                        return Ok(key_guess);
+                        result.push(key_guess);
                     }
+
+                    progress_bar.inc(1);
                 }
 
-                Err(simple_error!("Could not find a suitable key"))
+                if result.len() == 0 {
+                    Err(simple_error!("No suitable keys found"))
+                } else {
+                    Ok(result)
+                }
             }
             _ => {
-                let mut key = Vec::with_capacity(key_length);
-                for i in 0..key_length {
-                    key.push(self.get_key_at(data, i, key_length));
+                let mut key = ArrVec::<u8>::new();
+                for i in 0..context.key_length {
+                    key.push(self.get_key_at(data, i, context.key_length));
                 }
 
-                Ok(key)
+                let vec = Vec::from([key]);
+                Ok(vec)
             }
         }
     }
@@ -118,8 +134,8 @@ impl<'a, 'b> GuessMethod<'a, 'b> {
 
 pub fn guess_key(
     data: &[u8],
-    key_length: usize,
     method: GuessMethod,
-) -> Result<Vec<u8>, SimpleError> {
-    method.get_key(data, key_length)
+    context: &mut Context
+) -> Result<Vec<ArrVec<u8>>, SimpleError> {
+    method.get_key(data, context)
 }
