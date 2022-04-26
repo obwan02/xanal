@@ -1,5 +1,7 @@
+![xanal - an xor cryptoanalysis tool](img/banner.png)
+
 # XANAL
-The Xor ANALyser written in rust. This is a small project, mainly intended to be used in simple CTF challenges.
+An Xor cryptoANALyser written in rust. This is a small project, mainly intended to be used in simple CTF challenges. This tool exploits some properties of XOR  It has 3 modes of operation (currently). 
 
 ## Version 0.1.0 Checklist
 - [x] Update Cargo.toml to have correct info, and make sure it is displayed in clap 
@@ -9,10 +11,14 @@ The Xor ANALyser written in rust. This is a small project, mainly intended to be
 - [x] Move key guessing functions outside lib.rs
 
 ## Version 0.2.0 Checklist
-- [ ] Better READEME.md
+- [x] Better READEME.md
 - [ ] Loading bar for really long files
 - [ ] Add posibility for multiple different keys to be found
 - [ ] Examples README
+
+## Version 0.3.0 Checklist ??
+- [ ] Maybe implement [key elimination](https://en.wikipedia.org/wiki/Vigen%C3%A8re_cipher#Key_elimination)
+- [ ] Allow for iteration over values that aren't just bytes. For example each utf-8 character can be represented as a number. Implementing would be a pain due to key analysis, but key analysis could still just work on a per byte basis
 
 ## Future Versions (To be announced)
 - [ ] Move test files to test folder (and make proper tests)
@@ -20,6 +26,7 @@ The Xor ANALyser written in rust. This is a small project, mainly intended to be
 - [ ] Better logging
 - [ ] Improve most common byte evaluator
 - [ ] Add likelihood of the key found being correct (analyse difference between two known frequencies)
+- [ ] Examine multiple key length guesses
 
 ## Version 1.0.0 Checklist
 - [ ] Better CLI (maybe have different methods of running as subcommands). For example `xanal common <FILE>` and `xanal crib offset <CRIB> <OFFSET> <FILE>` and `xanal crib search <CRIB> <SEARCH> <FILE>`. May have different method in future the previous commands are just examples.
