@@ -247,7 +247,8 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) {
 
     if let Ok(guesses) = &key_guesses {
         for (i, item) in guesses.iter().enumerate() {
-            info!("{:-<35}", i);
+            let index_name = format!("{} ", i);
+            info!("{:-<35}", index_name);
             info!("Key Guess: {}", String::from_utf8_lossy(item));
             info!("Key Guess (base64): {}", base64::encode(item));
             info!("Key Guess (hex): 0x{}", hex::encode(item));
