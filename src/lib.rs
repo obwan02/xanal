@@ -142,7 +142,7 @@ impl Context {
 impl Drop for Context {
     fn drop(&mut self) {
         if let Some(x) = self.loading_bar.as_ref() {
-            x.finish_and_clear();
+            x.finish_using_style();
         }
     }
 }
@@ -242,6 +242,8 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) {
     }
 
     let key_guesses = guess_key(&data, method, &mut context);
+    // Drop the context so the loading bar appears correctly
+    std::mem::drop(context);
 
     if let Ok(guesses) = &key_guesses {
         for item in guesses {
