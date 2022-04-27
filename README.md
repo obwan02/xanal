@@ -14,8 +14,8 @@ An Xor cryptoANALyser written in rust. This is a small project, mainly intended 
 - [x] Better READEME.md
 - [x] Loading bar for really long files
 - [x] Add possibility for multiple different keys to be found
-- [ ] Output multiple files if more than one key is chosen
 - [x] Examples README
+- [ ] Output multiple files if more than one key is chosen
 
 ## Version 0.3.0 Checklist
 - [ ] Better logging

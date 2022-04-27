@@ -246,8 +246,8 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) {
     std::mem::drop(context);
 
     if let Ok(guesses) = &key_guesses {
-        for item in guesses {
-            info!("------------------------------");
+        for (i, item) in guesses.iter().enumerate() {
+            info!("{:-<35}", i);
             info!("Key Guess: {}", String::from_utf8_lossy(item));
             info!("Key Guess (base64): {}", base64::encode(item));
             info!("Key Guess (hex): 0x{}", hex::encode(item));
