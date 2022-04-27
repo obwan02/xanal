@@ -6,3 +6,6 @@
 
 # Ignore compiled stuff
 /target
+
+# ignore python stuff
+__pycache__/
