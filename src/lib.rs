@@ -1,12 +1,12 @@
 use clap::{ArgGroup, Parser};
 use log::{error, info, warn};
-use simple_error::{SimpleError, simple_error};
+use simple_error::{simple_error, SimpleError};
 use std::{
     error::Error,
+    ffi::OsStr,
     fmt::Display,
     fs::{File, OpenOptions},
-    io::{stdin, Read, Write},
-    ffi::OsStr,
+    io::{stdin, Read, Write, self},
     path::Path,
 };
 
@@ -167,38 +167,18 @@ pub fn decrypt<'a>(data: &'a [u8], key: &'a [u8]) -> impl Iterator<Item = u8> + 
         .map(|(i, &x)| x ^ key[i % key.len()])
 }
 
-fn read_input(config: &Config) -> Vec<u8> {
+fn read_input(config: &Config) -> Result<Vec<u8>, io::Error> {
     let mut buf = vec![];
 
     if config.file == "-" {
-        if let Err(e) = stdin().lock().read_to_end(&mut buf) {
-            error!("Failed to read from stdin because '{}'", e);
-            exit(-1, format!("Failed to read from stdin because '{}'", e));
-        }
-
-        return buf;
+        stdin().lock().read_to_end(&mut buf)?;
+        return Ok(buf);
     }
 
-    match File::open(&config.file) {
-        Ok(mut file) => {
-            if let Err(e) = file.read_to_end(&mut buf) {
-                error!("Failed to read file '{}' because '{}'", &config.file, e);
-                exit(
-                    -1,
-                    format!("Failed to read file '{}' because '{}'", &config.file, e),
-                );
-            }
-        }
-        Err(e) => {
-            error!("Failed to open file '{}' because '{}'", &config.file, e);
-            exit(
-                -1,
-                format!("Failed to open file '{}' because '{}'", &config.file, e),
-            );
-        }
-    }
+    let mut file = File::open(&config.file)?;
+    file.read_to_end(&mut buf)?;
 
-    buf
+   Ok(buf)
 }
 
 fn write_file(file_path: impl AsRef<Path>, data: &[u8]) -> Result<(), impl Error> {
@@ -216,7 +196,7 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
         enable_verbose();
     }
 
-    let data = read_input(&config);
+    let data = read_input(&config)?;
 
     let key_length = if let Some(x) = config.specific_key_length {
         info!("Using Key Length: {}", x);
@@ -257,7 +237,7 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
     info!("");
 
     let key_guesses = guess_key(&data, method, &mut context)?;
-    
+
     // Drop the context so the loading bar appears correctly
     std::mem::drop(context);
 
@@ -278,7 +258,7 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
 
     if let Some(output_file) = config.output_file {
         match key_guesses.len() {
-            0 => error!("No keys found"),
+            0 => return Err(Box::new(simple_error!("No keys found"))),
             1 => write_file(
                 output_file,
                 &decrypt(&data, &key_guesses[0]).collect::<Vec<_>>(),
@@ -288,9 +268,15 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
                     let path = std::path::Path::new(&output_file);
                     let path = path.with_file_name(&format!(
                         "{}-{}.{}",
-                        path.file_stem().unwrap_or(OsStr::new("")).to_str().unwrap_or(""),
+                        path.file_stem()
+                            .unwrap_or(OsStr::new(""))
+                            .to_str()
+                            .unwrap_or(""),
                         i,
-                        path.extension().unwrap_or(OsStr::new("")).to_str().unwrap_or(""),
+                        path.extension()
+                            .unwrap_or(OsStr::new(""))
+                            .to_str()
+                            .unwrap_or(""),
                     ));
 
                     write_file(path, &decrypt(&data, key).collect::<Vec<_>>())?;
