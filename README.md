@@ -15,11 +15,11 @@ An Xor cryptoANALyser written in rust. This is a small project, mainly intended 
 - [x] Loading bar for really long files
 - [x] Add possibility for multiple different keys to be found
 - [x] Examples README
-- [ ] Output multiple files if more than one key is chosen
+- [x] Output multiple files if more than one key is chosen
 
 ## Version 0.3.0 Checklist
 - [ ] Better logging
-- [ ] Implement [key elimination](https://en.wikipedia.org/wiki/Vigen%C3%A8re_cipher#Key_elimination) and remove crib and search (which is less effective)
+- [ ] Implement [key elimination](https://en.wikipedia.org/wiki/Vigen%C3%A8re_cipher#Key_elimination) and remove crib and search (which is less effective O(n^2) vs. O(n))
 - [ ] Check for repitions in key once it is solved, and reduce size if possible. i.e. "0x202020" => "0x20"
 
 ## Version 0.4.0
@@ -29,6 +29,7 @@ An Xor cryptoANALyser written in rust. This is a small project, mainly intended 
 - [ ] Better CLI (maybe have different methods of running as subcommands). For example `xanal common <FILE>` and `xanal crib offset <CRIB> <OFFSET> <FILE>` and `xanal crib search <CRIB> <SEARCH> <FILE>`. May have different method in future the previous commands are just examples.
 
 ## Future Versions (To be announced)
+- [ ] Move error messages to an other module
 - [ ] Move test files to test folder (and make proper tests)
 - [ ] Improve most common byte evaluator
 - [ ] Add likelihood of the key found being correct (analyse difference between two known frequencies)

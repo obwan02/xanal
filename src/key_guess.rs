@@ -1,8 +1,9 @@
+use std::error::Error;
 
 use crate::{decrypt, Context};
 use log::debug;
-use tinyvec::TinyVec;
 use simple_error::{simple_error, SimpleError};
+use tinyvec::TinyVec;
 
 pub const ARRAY_VEC_SIZE: usize = 64;
 pub type ArrVec<T> = TinyVec<[T; ARRAY_VEC_SIZE]>;
@@ -62,7 +63,7 @@ impl<'a, 'b> GuessMethod<'a, 'b> {
                         .collect();
 
                     key_guess.rotate_right(offset % context.key_length);
-                    
+
                     let data_test = decrypt(data, &key_guess);
 
                     let mut success = false;
@@ -135,7 +136,7 @@ impl<'a, 'b> GuessMethod<'a, 'b> {
 pub fn guess_key(
     data: &[u8],
     method: GuessMethod,
-    context: &mut Context
-) -> Result<Vec<ArrVec<u8>>, SimpleError> {
+    context: &mut Context,
+) -> Result<Vec<ArrVec<u8>>, impl Error> {
     method.get_key(data, context)
 }

@@ -1,6 +1,7 @@
 use clap::Parser;
 use flexi_logger::Logger;
 use xanal::{run, Config};
+use log::error;
 
 pub fn format_func(
     w: &mut dyn std::io::Write,
@@ -38,5 +39,8 @@ fn main() {
         .start()
         .unwrap();
 
-    run(config, || logger.parse_new_spec("debug").unwrap());
+    let result = run(config, || logger.parse_new_spec("debug").unwrap());
+    if let Err(e) = result {
+        error!("xanal failed: {}", e);
+    }
 }

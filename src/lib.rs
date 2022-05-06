@@ -1,9 +1,13 @@
 use clap::{ArgGroup, Parser};
 use log::{error, info, warn};
+use simple_error::{SimpleError, simple_error};
 use std::{
+    error::Error,
     fmt::Display,
     fs::{File, OpenOptions},
     io::{stdin, Read, Write},
+    ffi::OsStr,
+    path::Path,
 };
 
 #[cfg(not(test))]
@@ -15,10 +19,10 @@ mod kl_anal;
 #[derive(Parser, Debug)]
 #[clap(author = "Oliver W. (obwan02)", version, about, long_about = None)]
 #[clap(group(
-            ArgGroup::new("method")
-                .required(true)
-                .args(&["most-common-byte", "crib"])
-           ))]
+        ArgGroup::new("method")
+        .required(true)
+        .args(&["most-common-byte", "crib"])
+))]
 pub struct Config {
     /// The file to analyse
     ///
@@ -197,7 +201,15 @@ fn read_input(config: &Config) -> Vec<u8> {
     buf
 }
 
-pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) {
+fn write_file(file_path: impl AsRef<Path>, data: &[u8]) -> Result<(), impl Error> {
+    let mut options = OpenOptions::new();
+    options.write(true).create(true);
+
+    let mut file = options.open(file_path).map_err(SimpleError::from)?;
+    file.write_all(data).map_err(SimpleError::from)
+}
+
+pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Box<dyn Error>> {
     use key_guess::*;
 
     if config.verbose {
@@ -216,7 +228,7 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) {
     };
 
     if config.key_length_only {
-        return;
+        return Ok(());
     }
 
     // Establish context
@@ -241,38 +253,51 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) {
         warn!("The selected key length probably does not give enough data to analyse");
     }
 
-    let key_guesses = guess_key(&data, method, &mut context);
+    // print a empty line before displaying keys
+    info!("");
+
+    let key_guesses = guess_key(&data, method, &mut context)?;
+    
     // Drop the context so the loading bar appears correctly
     std::mem::drop(context);
 
-    if let Ok(guesses) = &key_guesses {
-        for (i, item) in guesses.iter().enumerate() {
-            let index_name = format!("{} ", i);
-            info!("{:-<35}", index_name);
-            info!("Key Guess: {}", String::from_utf8_lossy(item));
-            info!("Key Guess (base64): {}", base64::encode(item));
-            info!("Key Guess (hex): 0x{}", hex::encode(item));
-        }
-    } else {
-        error!("Error while guessing key: {}", key_guesses.unwrap_err());
-        return;
+    // The guess key function is never supposed to return 0 keys
+    // (if it does it returns an Err instead). However, it never hurts to
+    // be safe.
+    if key_guesses.len() == 0 {
+        return Err(Box::new(simple_error!("No suitable keys founds")));
     }
 
-    let key_guess = key_guesses.unwrap().pop().unwrap();
+    for (i, item) in key_guesses.iter().enumerate() {
+        let index_name = format!(" Guess #{} ", i);
+        info!("{:-^36}", index_name);
+        info!("Key Guess: {}", String::from_utf8_lossy(item));
+        info!("Key Guess (base64): {}", base64::encode(item));
+        info!("Key Guess (hex): 0x{}", hex::encode(item));
+    }
 
     if let Some(output_file) = config.output_file {
-        let mut options = OpenOptions::new();
-        options.write(true).create(true);
+        match key_guesses.len() {
+            0 => error!("No keys found"),
+            1 => write_file(
+                output_file,
+                &decrypt(&data, &key_guesses[0]).collect::<Vec<_>>(),
+            )?,
+            _ => {
+                for (i, key) in key_guesses.iter().enumerate() {
+                    let path = std::path::Path::new(&output_file);
+                    let path = path.with_file_name(&format!(
+                        "{}-{}.{}",
+                        path.file_stem().unwrap_or(OsStr::new("")).to_str().unwrap_or(""),
+                        i,
+                        path.extension().unwrap_or(OsStr::new("")).to_str().unwrap_or(""),
+                    ));
 
-        let data: Vec<u8> = decrypt(&data, &key_guess).collect();
-
-        match options.open(output_file) {
-            Ok(mut file) => {
-                if let Err(e) = file.write(&data) {
-                    error!("Failed to write to output file: {}", e);
+                    write_file(path, &decrypt(&data, key).collect::<Vec<_>>())?;
                 }
             }
-            Err(e) => error!("Failed to open output file: {}", e),
-        };
+        }
     }
+
+    Ok(())
 }
