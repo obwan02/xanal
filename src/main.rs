@@ -1,5 +1,5 @@
 use clap::Parser;
-use flexi_logger::{Logger, Level};
+use flexi_logger::{Level, Logger};
 use log::error;
 use xanal::{run, Config};
 

@@ -6,7 +6,7 @@ use std::{
     ffi::OsStr,
     fmt::Display,
     fs::{File, OpenOptions},
-    io::{stdin, Read, Write, self},
+    io::{self, stdin, Read, Write},
     path::Path,
 };
 
@@ -178,7 +178,7 @@ fn read_input(config: &Config) -> Result<Vec<u8>, io::Error> {
     let mut file = File::open(&config.file)?;
     file.read_to_end(&mut buf)?;
 
-   Ok(buf)
+    Ok(buf)
 }
 
 fn write_file(file_path: impl AsRef<Path>, data: &[u8]) -> Result<(), impl Error> {
@@ -266,13 +266,15 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
             _ => {
                 for (i, key) in key_guesses.iter().enumerate() {
                     let path = std::path::Path::new(&output_file);
+                    let dot = if path.extension().is_some() { "." } else { "" };
                     let path = path.with_file_name(&format!(
-                        "{}-{}.{}",
+                        "{}-{}{}{}",
                         path.file_stem()
                             .unwrap_or(OsStr::new(""))
                             .to_str()
                             .unwrap_or(""),
                         i,
+                        dot,
                         path.extension()
                             .unwrap_or(OsStr::new(""))
                             .to_str()
