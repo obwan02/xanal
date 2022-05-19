@@ -4,7 +4,7 @@ This directory contains files that have been xor encrypted, and restored by xana
 ## Test 1
 To solve the first example we use known plaintext because there is not much data.
 ```bash
-xanal examples\test1.enc --max-key-length 7 --crib Congratulations --crib-search "next challenge"
+xanal examples\test1.enc -m 7 crib Congratulations
 ```
 We also need to specify a shorter max key length otherwise xanal will guess the key is very long and will say the crib is too short (this will be fixed in later versions xox). We then give the program a crib and a search term (will be changed in he future to just be a single crib). The output is:
 ```
