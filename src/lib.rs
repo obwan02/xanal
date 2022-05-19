@@ -1,5 +1,5 @@
-use clap::{ArgGroup, Parser};
-use log::{error, info, warn};
+use clap::{Parser, Subcommand};
+use log::{info, warn};
 use simple_error::{simple_error, SimpleError};
 use std::{
     error::Error,
@@ -18,19 +18,17 @@ mod kl_anal;
 
 #[derive(Parser, Debug)]
 #[clap(author = "Oliver W. (obwan02)", version, about, long_about = None)]
-#[clap(group(
-        ArgGroup::new("method")
-        .required(true)
-        .args(&["most-common-byte", "crib"])
-))]
 pub struct Config {
     /// The file to analyse
     ///
     /// Specifies the input file for xanal to analyse.
     /// A '-' can be provided to read from stdin. If reading
     /// from stdin, the program will output after an EOF.
-    #[clap(required = true)]
+    #[clap(short = 'f', required = true)]
     file: String,
+
+    #[clap(subcommand)]
+    command: Commands,
 
     /// The output file to write the decrypted output to
     ///
@@ -47,7 +45,7 @@ pub struct Config {
     /// gives the closest ic value to the target ic value is
     /// selected. The max-key-length param is the upper bound
     /// (inclusive) of the key lengths to check.
-    #[clap(long, default_value_t = 32)]
+    #[clap(short, long, default_value_t = 32)]
     max_key_length: usize,
 
     /// A specific key length to use to guess the key (skips key length analysis)
@@ -68,42 +66,6 @@ pub struct Config {
     /// the english langauge.
     #[clap(short, long = "target-ic", default_value_t = 0.067)]
     target_ic: f32,
-
-    /// The most common byte for key analysis.
-    ///
-    /// This is the default analysis option that is used when no arguments are
-    /// passed to xanal. The default most common byte is 0x20, which is the space
-    /// character. This flag cannot be used in conjunction with the 'crib' flag, which
-    /// uses crib analysis for guessing the key.
-    #[clap(short = 'c', long, default_value_t = 0x20)]
-    most_common_byte: u8,
-
-    /// The crib to be used for key analysis.
-    ///
-    /// The crib flag specifies that a crib will be used to
-    /// find the key. This is an alternative to analysis by
-    /// most common byte. Cannot be used in conjunction with the
-    /// 'most_common_byte' flag. This flag requires one of
-    /// the 'crib-offset' or 'crib-search' flags to be set.
-    #[clap(long = "crib", requires = "crib-method")]
-    crib: Option<String>,
-
-    /// The crib offset to be used for key analysis
-    ///
-    /// The crib flag specifies that a key analysis should be done using
-    /// a crib. Specifying this flag (crib-offset) uses the mode of crib offset
-    /// to recover the key. Cannot be used in conjunction with 'crib-search' flag.
-    #[clap(long = "crib-offset", requires = "crib", group = "crib-method")]
-    crib_offset: Option<usize>,
-
-    /// The crib search to be used for key analysis
-    ///
-    /// The crib flag specifies that a key analysis should be done using
-    /// a crib. Specifying this flag (crib-search) uses the mode of crib search
-    /// to recover the key. This method works by testing the crib in all possible
-    /// positions and seeing if the search term appears in the ouptut.
-    #[clap(long = "crib-search", requires = "crib", group = "crib-method")]
-    crib_search: Option<String>,
 
     /// Specifies if the output should be verbose or not
     #[clap(short, long)]
@@ -146,9 +108,48 @@ impl Context {
 impl Drop for Context {
     fn drop(&mut self) {
         if let Some(x) = self.loading_bar.as_ref() {
-            x.finish();
+            if !x.is_finished() {
+                x.finish_and_clear();
+            }
         }
     }
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+
+    /// Perform most common byte analysis on the input data
+    ///
+    /// This form of analysis is best used for lots of data. It works by 
+    /// analysing every 'key length'th byte and finding the most common byte.
+    /// It then XORs this byte with the provided most common byte (default 32 which is an ascii
+    /// space) to find the nth key character.
+    #[clap(name="common")]
+    MostCommon {
+        /// Specifies the most common byte that should be used in analysis
+        ///
+        /// This argument specifies (in integer form) the most common byte
+        /// that should be used when cracking the key. Default is 32, which is
+        /// an ascii ' '.
+        most_common_byte: Option<u8>,
+    },
+
+    /// Perform key elimination using a crib (known plaintext)
+    ///
+    /// The provided crib should be at least 4 characters longer then the key length
+    /// to make an accurate guesses. This method is fairly detailed and to read futher 
+    /// visit https://en.wikipedia.org/wiki/Vigen%C3%A8re_cipher#Key_elimination
+    #[clap(name = "crib")]
+    KeyElimination {
+        /// Specifies the crib to use with key elimination
+        ///
+        /// This argument specifies the crib to use for key elimination. The longer
+        /// the key the more accurate the results will be. They key must be at least as long
+        /// as the guessed key length + 1. Note that having a crib only 1 longer than the key
+        /// length will probably give you garbage results, and you should aim to have a crib that
+        /// is at least 4 characters longer than the estimated key length for accurate results.
+        crib: String,
+    },
 }
 
 #[cfg(test)]
@@ -214,15 +215,11 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
     // Establish context
     let mut context = Context::new(key_length);
 
-    let method = match (&config.crib, &config.crib_offset, &config.crib_search) {
-        (Some(crib), Some(offset), None) => GuessMethod::Crib(crib.as_bytes(), *offset),
-        (Some(crib), None, Some(search)) => {
-            GuessMethod::CribAndSearch(crib.as_bytes(), search.as_bytes())
-        }
-        (Some(_), Some(_), Some(_)) => unreachable!(),
-        (Some(_), ..) => unreachable!(),
-        (None, None, None) => GuessMethod::MostCommon(config.most_common_byte),
-        (None, ..) => unreachable!(),
+    let method = match &config.command {
+        Commands::MostCommon {
+            most_common_byte: x,
+        } => GuessMethod::MostCommon(x.unwrap_or(32)),
+        Commands::KeyElimination { crib } => GuessMethod::KeyElimination(crib.as_bytes()),
     };
 
     // We need to warn users about using the most common method with very few data points.
@@ -232,9 +229,6 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
     if matches!(method, GuessMethod::MostCommon(..)) && data.len() / key_length < 30 {
         warn!("The selected key length probably does not give enough data to analyse");
     }
-
-    // print a empty line before displaying keys
-    println!("");
 
     let key_guesses = guess_key(&data, method, &mut context)?;
 
@@ -247,10 +241,10 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
 
     for (i, item) in key_guesses.iter().enumerate() {
         let index_name = format!(" Guess #{} ", i);
-        println!("{:-^36}", index_name);
-        println!("Key Guess: {}", String::from_utf8_lossy(item));
-        println!("Key Guess (base64): {}", base64::encode(item));
-        println!("Key Guess (hex): 0x{}", hex::encode(item));
+        info!("{:-^36}", index_name);
+        info!("Key Guess: {}", String::from_utf8_lossy(item));
+        info!("Key Guess (base64): {}", base64::encode(item));
+        info!("Key Guess (hex): 0x{}", hex::encode(item));
     }
 
     if let Some(output_file) = config.output_file {

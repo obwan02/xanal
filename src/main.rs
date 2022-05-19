@@ -15,15 +15,10 @@ pub fn format_func(
         Level::Warn => flexi_logger::style(Level::Warn).paint("?"),
         Level::Info => flexi_logger::style(Level::Debug).paint("*"),
         Level::Debug => flexi_logger::style(Level::Trace).paint("d"),
-        Level::Trace => flexi_logger::style(Level::Info).paint("t")
+        Level::Trace => flexi_logger::style(Level::Info).paint("t"),
     };
-    
-    write!(
-        w,
-        "[{marker}] {msg}",
-        marker = marker,
-        msg = record.args(),
-    )
+
+    write!(w, "[{marker}] {msg}", marker = marker, msg = record.args(),)
 }
 
 pub fn format_func_no_color(

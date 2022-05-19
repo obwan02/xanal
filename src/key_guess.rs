@@ -1,39 +1,27 @@
 use std::error::Error;
-
-use crate::{decrypt, Context};
-use log::{debug, info};
+use crate::Context;
+use log::debug;
 use simple_error::{simple_error, SimpleError};
 use tinyvec::TinyVec;
 
 pub const ARRAY_VEC_SIZE: usize = 64;
 pub type ArrVec<T> = TinyVec<[T; ARRAY_VEC_SIZE]>;
 
-pub enum GuessMethod<'a, 'b> {
+pub enum GuessMethod<'a> {
     MostCommon(u8),
-    Crib(&'a [u8], usize),
-
-    // First argument is the crib
-    // second argument is search
-    #[allow(dead_code)]
-    CribAndSearch(&'a [u8], &'b [u8]),
+    KeyElimination(&'a [u8]),
 }
 
-impl<'a, 'b> GuessMethod<'a, 'b> {
+impl<'a> GuessMethod<'a> {
     // Checks if the guessing method is valid
     // for a certain key length
-    fn is_valid(&self, data: &[u8], key_length: usize) -> Result<(), SimpleError> {
+    fn is_valid(&self, _data: &[u8], key_length: usize) -> Result<(), SimpleError> {
         use GuessMethod::*;
         match &self {
             MostCommon(_) => Ok(()),
-            CribAndSearch(crib, _) if key_length > crib.len() => {
-                Err(simple_error!("The crib is shorter than the key length"))
-            }
-            Crib(crib, _) if key_length > crib.len() => {
-                Err(simple_error!("The crib is shorter than the key length"))
-            }
-            Crib(crib, offset) if offset + crib.len() > data.len() => {
-                Err(simple_error!("The crib is offset too far into the file"))
-            }
+            KeyElimination(crib) if key_length >= crib.len() => Err(simple_error!(
+                "The crib should be at least one character longer than the key length"
+            )),
             _ => Ok(()),
         }
     }
@@ -46,89 +34,67 @@ impl<'a, 'b> GuessMethod<'a, 'b> {
         }
 
         match self {
-            CribAndSearch(crib, search) => {
-                let limit = data.len() - crib.len();
-
+            KeyElimination(crib) => {
                 // TODO: search for multiple keys so all data has to be searched
-                let progress_bar = context.request_loading_bar(limit);
-                let mut result = Vec::with_capacity(100);
+                let mut keys = Vec::with_capacity(100);
 
-                for offset in 0..limit {
-                    let mut key_guess: ArrVec<u8> = data
-                        .iter()
-                        .skip(offset)
-                        .take(context.key_length)
-                        .enumerate()
-                        .map(|(i, &x)| x ^ crib[i])
-                        .collect();
+                let crib_diff: Vec<u8> = crib
+                    .iter()
+                    .zip(&crib[context.key_length..])
+                    .map(|(x, y)| x ^ y)
+                    .collect();
 
-                    key_guess.rotate_right(offset % context.key_length);
+                let enc_diff: Vec<u8> = data
+                    .iter()
+                    .zip(&data[context.key_length..])
+                    .map(|(x, y)| x ^ y)
+                    .collect();
 
-                    let data_test = decrypt(data, &key_guess);
 
-                    let mut success = false;
-                    let mut si = 0;
-                    for x in data_test {
-                        if x == search[si] {
-                            si += 1;
-                        } else {
-                            si = 0;
-                        }
+                let len = enc_diff.len() - crib_diff.len();
+                let loading_bar = context.request_loading_bar(enc_diff.len());
 
-                        if si == search.len() - 1 {
-                            success = true;
-                            break;
-                        }
+                for i in 0..len {
+                    let end_index = i + crib_diff.len();
+                    if &enc_diff[i..end_index] == &crib_diff {
+                        let key: ArrVec<u8> = crib[0..context.key_length]
+                            .iter()
+                            .zip(&data[i..])
+                            .map(|(x, y)| x ^ y)
+                            .collect();
+                        keys.push(key);
                     }
 
-                    if success {
-                        result.push(key_guess);
-                    }
-
-                    progress_bar.inc(1);
+                    loading_bar.inc(1);
                 }
 
-                if result.len() == 0 {
-                    Err(simple_error!("No suitable keys found"))
-                } else {
-                    progress_bar.finish();
-                    Ok(result)
-                }
+                loading_bar.finish();
+
+                Ok(keys)
             }
-            _ => {
+
+            MostCommon(common) => {
                 let mut key = ArrVec::<u8>::new();
                 for i in 0..context.key_length {
-                    key.push(self.get_key_at(data, i, context.key_length));
+                    let mut freqs = [0usize; 256];
+                    data.iter()
+                        .skip(i)
+                        .step_by(context.key_length)
+                        .for_each(|x| freqs[*x as usize] += 1);
+                    let most_freq = freqs
+                        .iter()
+                        .enumerate()
+                        .reduce(|(ci, cx), (i, x)| if x > cx { (i, x) } else { (ci, cx) })
+                        .unwrap()
+                        .0 as u8;
+
+                    debug!("Most frequent byte found was {:#x}", most_freq);
+                    key.push(most_freq ^ common)
                 }
 
-                let vec = Vec::from([key]);
-                Ok(vec)
-            }
-        }
-    }
-
-    fn get_key_at(&self, data: &[u8], key_index: usize, key_length: usize) -> u8 {
-        use GuessMethod::*;
-        match &self {
-            MostCommon(common) => {
-                let mut freqs = [0usize; 256];
-                data.iter()
-                    .skip(key_index)
-                    .step_by(key_length)
-                    .for_each(|x| freqs[*x as usize] += 1);
-                let most_freq = freqs
-                    .iter()
-                    .enumerate()
-                    .reduce(|(ci, cx), (i, x)| if x > cx { (i, x) } else { (ci, cx) })
-                    .unwrap()
-                    .0 as u8;
-
-                debug!("Most frequent byte found was {:#x}", most_freq);
-                most_freq ^ common
-            }
-            Crib(crib, offset) => data[offset + key_index] ^ crib[key_index],
-            CribAndSearch(_, _) => {
-                unimplemented!("get_key_at cannot be used for enum variant CribAndSearch")
+                let mut keys = Vec::new();
+                keys.push(key);
+                Ok(keys)
             }
         }
     }
