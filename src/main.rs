@@ -9,10 +9,20 @@ pub fn format_func(
     record: &flexi_logger::Record,
 ) -> Result<(), std::io::Error> {
     let level = record.level();
+
+    let marker = match level {
+        Level::Error => flexi_logger::style(Level::Error).paint("!"),
+        Level::Warn => flexi_logger::style(Level::Warn).paint("?"),
+        Level::Info => flexi_logger::style(Level::Debug).paint("*"),
+        Level::Debug => flexi_logger::style(Level::Trace).paint("d"),
+        Level::Trace => flexi_logger::style(Level::Info).paint("t")
+    };
+    
     write!(
         w,
-        "{}",
-        flexi_logger::style(level).paint(record.args().to_string())
+        "[{marker}] {msg}",
+        marker = marker,
+        msg = record.args(),
     )
 }
 

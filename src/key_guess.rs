@@ -1,7 +1,7 @@
 use std::error::Error;
 
 use crate::{decrypt, Context};
-use log::debug;
+use log::{debug, info};
 use simple_error::{simple_error, SimpleError};
 use tinyvec::TinyVec;
 
@@ -91,6 +91,7 @@ impl<'a, 'b> GuessMethod<'a, 'b> {
                 if result.len() == 0 {
                     Err(simple_error!("No suitable keys found"))
                 } else {
+                    progress_bar.finish();
                     Ok(result)
                 }
             }

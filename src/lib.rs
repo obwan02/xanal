@@ -146,7 +146,7 @@ impl Context {
 impl Drop for Context {
     fn drop(&mut self) {
         if let Some(x) = self.loading_bar.as_ref() {
-            x.finish_using_style();
+            x.finish();
         }
     }
 }
@@ -237,9 +237,6 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
     info!("");
 
     let key_guesses = guess_key(&data, method, &mut context)?;
-
-    // Drop the context so the loading bar appears correctly
-    std::mem::drop(context);
 
     // The guess key function is never supposed to return 0 keys
     // (if it does it returns an Err instead). However, it never hurts to
