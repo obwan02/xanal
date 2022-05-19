@@ -234,7 +234,7 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
     }
 
     // print a empty line before displaying keys
-    info!("");
+    println!("");
 
     let key_guesses = guess_key(&data, method, &mut context)?;
 
@@ -247,10 +247,10 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
 
     for (i, item) in key_guesses.iter().enumerate() {
         let index_name = format!(" Guess #{} ", i);
-        info!("{:-^36}", index_name);
-        info!("Key Guess: {}", String::from_utf8_lossy(item));
-        info!("Key Guess (base64): {}", base64::encode(item));
-        info!("Key Guess (hex): 0x{}", hex::encode(item));
+        println!("{:-^36}", index_name);
+        println!("Key Guess: {}", String::from_utf8_lossy(item));
+        println!("Key Guess (base64): {}", base64::encode(item));
+        println!("Key Guess (hex): 0x{}", hex::encode(item));
     }
 
     if let Some(output_file) = config.output_file {
