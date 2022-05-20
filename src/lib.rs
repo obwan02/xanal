@@ -19,14 +19,6 @@ mod kl_anal;
 #[derive(Parser, Debug)]
 #[clap(author = "Oliver W. (obwan02)", version, about, long_about = None)]
 pub struct Config {
-    /// The file to analyse
-    ///
-    /// Specifies the input file for xanal to analyse.
-    /// A '-' can be provided to read from stdin. If reading
-    /// from stdin, the program will output after an EOF.
-    #[clap(short = 'f', required = true)]
-    file: String,
-
     #[clap(subcommand)]
     command: Commands,
 
@@ -35,7 +27,7 @@ pub struct Config {
     /// This flag is optional. If provided, the decrypted output
     /// will be written to the specified file. It will only write to
     /// the file if there are no errors during other stages of the program.
-    #[clap(short, long)]
+    #[clap(short, long, global = true)]
     output_file: Option<String>,
 
     /// The maximum key length to check for key length analysis
@@ -45,7 +37,7 @@ pub struct Config {
     /// gives the closest ic value to the target ic value is
     /// selected. The max-key-length param is the upper bound
     /// (inclusive) of the key lengths to check.
-    #[clap(short, long, default_value_t = 32)]
+    #[clap(short, long, default_value_t = 32, global = true)]
     max_key_length: usize,
 
     /// A specific key length to use to guess the key (skips key length analysis)
@@ -53,7 +45,7 @@ pub struct Config {
     /// Using this options skips the key length analysis stage,
     /// and instead of guessing the key length, uses the one  
     /// provided.
-    #[clap(short = 'k', long = "key-length")]
+    #[clap(short = 'k', long = "key-length", global = true)]
     specific_key_length: Option<usize>,
 
     /// The target index of coincidence to use for key length analysis.
@@ -64,25 +56,25 @@ pub struct Config {
     /// key length that is chosen. This argument specifies the target ic
     /// to compare against (not normalised). By default it is the index of coincidence of
     /// the english langauge.
-    #[clap(short, long = "target-ic", default_value_t = 0.067)]
+    #[clap(short, long = "target-ic", default_value_t = 0.067, global = true)]
     target_ic: f32,
 
     /// Specifies if the output should be verbose or not
-    #[clap(short, long)]
+    #[clap(short, long, global = true)]
     pub verbose: bool,
 
     /// Specifies if the output shouldn't be colored
     ///
     /// This option is mainly for use in scripts and other
     /// programs where you just want raw standard ouptut
-    #[clap(long)]
+    #[clap(long, global = true)]
     pub no_color_output: bool,
 
     /// Specifies that only key length analysis should be run
     ///
     /// This option will make only the key length analysis portion
     /// of the program run.
-    #[clap(short = 'l', long)]
+    #[clap(short = 'l', long, global = true)]
     pub key_length_only: bool,
 }
 
@@ -131,6 +123,14 @@ enum Commands {
     /// space) to find the nth key character.
     #[clap(name = "common")]
     MostCommon {
+        /// The file to analyse
+        ///
+        /// Specifies the input file for xanal to analyse.
+        /// A '-' can be provided to read from stdin. If reading
+        /// from stdin, the program will output after an EOF.
+        #[clap(short = 'f')]
+        file: String,
+
         /// Specifies the most common byte that should be used in analysis
         ///
         /// This argument specifies (in integer form) the most common byte
@@ -146,6 +146,14 @@ enum Commands {
     /// visit https://en.wikipedia.org/wiki/Vigen%C3%A8re_cipher#Key_elimination
     #[clap(name = "crib")]
     KeyElimination {
+        /// The file to analyse
+        ///
+        /// Specifies the input file for xanal to analyse.
+        /// A '-' can be provided to read from stdin. If reading
+        /// from stdin, the program will output after an EOF.
+        #[clap(short = 'f')]
+        file: String,
+
         /// Specifies the crib to use with key elimination
         ///
         /// This argument specifies the crib to use for key elimination. The longer
@@ -176,12 +184,17 @@ pub fn decrypt<'a>(data: &'a [u8], key: &'a [u8]) -> impl Iterator<Item = u8> + 
 fn read_input(config: &Config) -> Result<Vec<u8>, io::Error> {
     let mut buf = vec![];
 
-    if config.file == "-" {
+    let file = match &config.command {
+        Commands::MostCommon { ref file, .. } => file,
+        Commands::KeyElimination { ref file, .. } => file,
+    };
+
+    if file.as_str() == "-" {
         stdin().lock().read_to_end(&mut buf)?;
         return Ok(buf);
     }
 
-    let mut file = File::open(&config.file)?;
+    let mut file = File::open(&file)?;
     file.read_to_end(&mut buf)?;
 
     Ok(buf)
@@ -231,8 +244,9 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
     let method = match &config.command {
         Commands::MostCommon {
             most_common_byte: x,
+            ..
         } => GuessMethod::MostCommon(x.unwrap_or(32)),
-        Commands::KeyElimination { crib } => GuessMethod::KeyElimination(crib.as_bytes()),
+        Commands::KeyElimination { crib, .. } => GuessMethod::KeyElimination(crib.as_bytes()),
     };
 
     // We need to warn users about using the most common method with very few data points.

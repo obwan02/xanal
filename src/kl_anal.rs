@@ -36,7 +36,7 @@ pub fn analyse_key_length(data: &[u8], max_length: usize, target_ic: f32) -> usi
     for i in 1..=max_length {
         let length = NonZeroUsize::new(i).unwrap();
         let ic = calc_ic_for_key_length(data, length);
-        ic_vals[i-1] = ic;
+        ic_vals[i - 1] = ic;
     }
 
     let mut best_guess_i = 0;
@@ -54,7 +54,6 @@ pub fn analyse_key_length(data: &[u8], max_length: usize, target_ic: f32) -> usi
             // This is the check for a value being close
             // and checking for multiples
             if (diff - best_diff).abs() <= 0.001 {
-                
                 // If the length is not a multiple don't ignore it
                 if !((i + 1) % (best_guess_i + 1) == 0) {
                     best_guess_i = i;
@@ -63,13 +62,18 @@ pub fn analyse_key_length(data: &[u8], max_length: usize, target_ic: f32) -> usi
                 }
             } else {
                 best_guess_i = i
-            }    
+            }
         }
 
         if is_multiple {
-            debug!("Key Length: {}, IC: {} {}", i+1, ic_vals[i], style(format!("IGNORED: Multiple of {}", best_guess_i+1)).red());
+            debug!(
+                "Key Length: {}, IC: {} {}",
+                i + 1,
+                ic_vals[i],
+                style(format!("IGNORED: Multiple of {}", best_guess_i + 1)).red()
+            );
         } else {
-            debug!("Key Length: {}, IC: {}", i+1, ic_vals[i]);
+            debug!("Key Length: {}, IC: {}", i + 1, ic_vals[i]);
         }
     }
 
