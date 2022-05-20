@@ -1,6 +1,6 @@
 [package]
 name = "xanal"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["obwan02"]
 edition = "2021"
 description = "An Xor ANALyser for cryptanalysis"
