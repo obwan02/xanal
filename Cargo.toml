@@ -18,6 +18,7 @@ tinyvec = { version = "1.6", features = ["alloc"] }
 clap = { version = "3", features = ["derive"] }
 indicatif = "0.16"
 dotenv = "0.15"
+console = "0.15"
 flexi_logger = "0.22"
 lipsum = "0.8"
 base64 = "0.13"

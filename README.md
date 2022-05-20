@@ -20,8 +20,8 @@ An Xor cryptoANALyser written in rust. This is a small project, mainly intended 
 ## Version 0.3.0 Checklist
 - [x] Better logging
 - [x] Implement [key elimination](https://en.wikipedia.org/wiki/Vigen%C3%A8re_cipher#Key_elimination) and remove crib and search (which is less effective O(n^2) vs. O(n))
-- [ ] Change loading bar style
-- [ ] Check for repitions in key once it is solved, and reduce size if possible. i.e. "0x202020" => "0x20"
+- [x] Change loading bar style
+- [x] Check for repitions in key once it is solved, and reduce size if possible. i.e. "0x202020" => "0x20"
 
 ## Version 0.4.0
 - [ ] Maximum key size should be chosen algorithmically (i.e. for small input sizes (10-20 chars) max key input should be between 0 and 10) or maybe just a table for small values.

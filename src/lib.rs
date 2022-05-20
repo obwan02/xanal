@@ -101,6 +101,12 @@ impl Context {
 
     fn request_loading_bar(&mut self, len: usize) -> indicatif::ProgressBar {
         self.loading_bar = Some(indicatif::ProgressBar::new(len as u64));
+        self.loading_bar
+            .as_ref()
+            .unwrap()
+            .set_style(indicatif::ProgressStyle::default_bar().template(
+            "{percent:>3}% [{elapsed_precise}] {bar:40.green/white} {bytes:>7}/{total_bytes:7} [eta {eta_precise}]",
+        ).progress_chars("▰▱"));
         self.loading_bar.as_ref().unwrap().clone()
     }
 }
@@ -117,14 +123,13 @@ impl Drop for Context {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-
     /// Perform most common byte analysis on the input data
     ///
-    /// This form of analysis is best used for lots of data. It works by 
+    /// This form of analysis is best used for lots of data. It works by
     /// analysing every 'key length'th byte and finding the most common byte.
     /// It then XORs this byte with the provided most common byte (default 32 which is an ascii
     /// space) to find the nth key character.
-    #[clap(name="common")]
+    #[clap(name = "common")]
     MostCommon {
         /// Specifies the most common byte that should be used in analysis
         ///
@@ -137,7 +142,7 @@ enum Commands {
     /// Perform key elimination using a crib (known plaintext)
     ///
     /// The provided crib should be at least 4 characters longer then the key length
-    /// to make an accurate guesses. This method is fairly detailed and to read futher 
+    /// to make an accurate guesses. This method is fairly detailed and to read futher
     /// visit https://en.wikipedia.org/wiki/Vigen%C3%A8re_cipher#Key_elimination
     #[clap(name = "crib")]
     KeyElimination {
@@ -198,12 +203,20 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
     }
 
     let data = read_input(&config)?;
+    if data.len() == 0 {
+        return Err(Box::new(simple_error!("No data was provided")));
+    }
 
     let key_length = if let Some(x) = config.specific_key_length {
         info!("Using Key Length: {}", x);
         x
     } else {
         let x = kl_anal::analyse_key_length(&data, config.max_key_length, 0.067);
+
+        if x == 0 {
+            return Err(Box::new(simple_error!("Guessed key length is 0")));
+        }
+
         info!("Key Length Guess: {}", x);
         x
     };

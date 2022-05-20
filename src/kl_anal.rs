@@ -1,3 +1,4 @@
+use console::style;
 use log::debug;
 use std::num::NonZeroUsize;
 
@@ -29,22 +30,48 @@ fn calc_ic_for_key_length(data: &[u8], key_length: NonZeroUsize) -> f32 {
 
 pub fn analyse_key_length(data: &[u8], max_length: usize, target_ic: f32) -> usize {
     let mut ic_vals = Vec::new();
-    ic_vals.resize(max_length + 2, f32::MAX);
-
-    let max_length = max_length.min(data.len());
+    let max_length = usize::min(max_length, data.len());
+    ic_vals.resize(max_length, f32::MAX);
 
     for i in 1..=max_length {
         let length = NonZeroUsize::new(i).unwrap();
         let ic = calc_ic_for_key_length(data, length);
-        ic_vals[i] = ic;
-        debug!("Key Length: {}, IC: {}", i, ic);
+        ic_vals[i-1] = ic;
     }
 
-    ic_vals
-        .iter()
-        .map(|x| f32::abs(x - target_ic))
-        .enumerate()
-        .reduce(|(ci, cx), (i, x)| if x < cx { (i, x) } else { (ci, cx) })
-        .unwrap()
-        .0
+    let mut best_guess_i = 0;
+    for i in 0..ic_vals.len() {
+        let diff = (ic_vals[i] - target_ic).abs();
+        let best_diff = (ic_vals[best_guess_i] - target_ic).abs();
+
+        let mut is_multiple = false;
+
+        // If the ic values are approx the same
+        // we check if current key length is a multiple
+        // of the previous best. If it is we ignore it
+        // otherwise we choose the longer key length
+        if diff < best_diff {
+            // This is the check for a value being close
+            // and checking for multiples
+            if (diff - best_diff).abs() <= 0.001 {
+                
+                // If the length is not a multiple don't ignore it
+                if !((i + 1) % (best_guess_i + 1) == 0) {
+                    best_guess_i = i;
+                } else {
+                    is_multiple = true;
+                }
+            } else {
+                best_guess_i = i
+            }    
+        }
+
+        if is_multiple {
+            debug!("Key Length: {}, IC: {} {}", i+1, ic_vals[i], style(format!("IGNORED: Multiple of {}", best_guess_i+1)).red());
+        } else {
+            debug!("Key Length: {}, IC: {}", i+1, ic_vals[i]);
+        }
+    }
+
+    best_guess_i + 1
 }

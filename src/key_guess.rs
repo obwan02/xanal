@@ -1,7 +1,7 @@
-use std::error::Error;
 use crate::Context;
 use log::debug;
 use simple_error::{simple_error, SimpleError};
+use std::error::Error;
 use tinyvec::TinyVec;
 
 pub const ARRAY_VEC_SIZE: usize = 64;
@@ -15,12 +15,15 @@ pub enum GuessMethod<'a> {
 impl<'a> GuessMethod<'a> {
     // Checks if the guessing method is valid
     // for a certain key length
-    fn is_valid(&self, _data: &[u8], key_length: usize) -> Result<(), SimpleError> {
+    fn is_valid(&self, data: &[u8], key_length: usize) -> Result<(), SimpleError> {
         use GuessMethod::*;
         match &self {
             MostCommon(_) => Ok(()),
             KeyElimination(crib) if key_length >= crib.len() => Err(simple_error!(
                 "The crib should be at least one character longer than the key length"
+            )),
+            KeyElimination(crib) if crib.len() > data.len() => Err(simple_error!(
+                "The crib cannot be longer than the data provided"
             )),
             _ => Ok(()),
         }
@@ -50,8 +53,8 @@ impl<'a> GuessMethod<'a> {
                     .map(|(x, y)| x ^ y)
                     .collect();
 
-
                 let len = enc_diff.len() - crib_diff.len();
+                debug!("searching through length {}", len);
                 let loading_bar = context.request_loading_bar(enc_diff.len());
 
                 for i in 0..len {
