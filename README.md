@@ -19,7 +19,7 @@ An Xor cryptoANALyser written in rust. This is a small project, mainly intended 
 
 ## Version 0.3.0 Checklist
 - [x] Better logging
-- [ ] Implement [key elimination](https://en.wikipedia.org/wiki/Vigen%C3%A8re_cipher#Key_elimination) and remove crib and search (which is less effective O(n^2) vs. O(n))
+- [x] Implement [key elimination](https://en.wikipedia.org/wiki/Vigen%C3%A8re_cipher#Key_elimination) and remove crib and search (which is less effective O(n^2) vs. O(n))
 - [ ] Check for repitions in key once it is solved, and reduce size if possible. i.e. "0x202020" => "0x20"
 
 ## Version 0.4.0

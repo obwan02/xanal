@@ -57,12 +57,15 @@ impl<'a> GuessMethod<'a> {
                 for i in 0..len {
                     let end_index = i + crib_diff.len();
                     if &enc_diff[i..end_index] == &crib_diff {
-                        let key: ArrVec<u8> = crib[0..context.key_length]
+                        let mut key: ArrVec<u8> = crib[0..context.key_length]
                             .iter()
                             .zip(&data[i..])
                             .map(|(x, y)| x ^ y)
                             .collect();
-                        keys.push(key);
+                        key.rotate_right(i % context.key_length);
+                        if !keys.contains(&key) {
+                            keys.push(key);
+                        }
                     }
 
                     loading_bar.inc(1);
