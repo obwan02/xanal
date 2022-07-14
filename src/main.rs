@@ -1,7 +1,7 @@
 use clap::Parser;
 use flexi_logger::{Level, Logger};
 use log::error;
-use xanal::{run, Config};
+use xcrypt::{run, Config};
 
 pub fn format_func(
     w: &mut dyn std::io::Write,

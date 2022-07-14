@@ -39,6 +39,15 @@ pub fn analyse_key_length(data: &[u8], max_length: usize, target_ic: f32) -> usi
         ic_vals[i - 1] = ic;
     }
 
+    // Calculate IC tolerance based on data length
+    let ic_tolerance = if data.len() != 1 {
+        0.1 / f32::ln(data.len() as f32)
+    } else {
+        0.1
+    };
+
+    debug!("IC Tolerance is {}", ic_tolerance);
+
     let mut best_guess_i = 0;
     for i in 0..ic_vals.len() {
         let diff = (ic_vals[i] - target_ic).abs();
@@ -53,7 +62,7 @@ pub fn analyse_key_length(data: &[u8], max_length: usize, target_ic: f32) -> usi
         if diff < best_diff {
             // This is the check for a value being close
             // and checking for multiples
-            if (diff - best_diff).abs() <= 0.001 {
+            if (diff - best_diff).abs() <= ic_tolerance {
                 // If the length is not a multiple don't ignore it
                 if !((i + 1) % (best_guess_i + 1) == 0) {
                     best_guess_i = i;

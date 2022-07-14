@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use log::{info, warn};
+use log::info;
 use simple_error::{simple_error, SimpleError};
 use std::{
     error::Error,
@@ -241,23 +241,12 @@ pub fn run(config: Config, enable_verbose: impl FnOnce() -> ()) -> Result<(), Bo
     // Establish context
     let mut context = Context::new(key_length);
 
-    let method = match &config.command {
-        Commands::MostCommon {
-            most_common_byte: x,
-            ..
-        } => GuessMethod::MostCommon(x.unwrap_or(32)),
-        Commands::KeyElimination { crib, .. } => GuessMethod::KeyElimination(crib.as_bytes()),
+    let method: Box<dyn GuessMethod> = match &config.command {
+        Commands::MostCommon { most_common_byte: x, .. } => Box::new(MostCommonMethod{common: x.unwrap_or(32)}),
+        Commands::KeyElimination { crib, .. } => Box::new(KeyEliminationMethod{ crib: crib.as_bytes() }),
     };
 
-    // We need to warn users about using the most common method with very few data points.
-    // This is because frequency analysis isn't very effective with much data. I choose the warning
-    // point as 30 characters because everybody always says 30 is a good sample size (it also is
-    // probably a bare minimum in case of frequency analysis because the range of .
-    if matches!(method, GuessMethod::MostCommon(..)) && data.len() / key_length < 30 {
-        warn!("The selected key length probably does not give enough data to analyse");
-    }
-
-    let key_guesses = guess_key(&data, method, &mut context)?;
+    let key_guesses = guess_key(&data, method.as_ref(), &mut context)?;
 
     // The guess key function is never supposed to return 0 keys
     // (if it does it returns an Err instead). However, it never hurts to

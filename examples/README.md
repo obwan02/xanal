@@ -1,12 +1,12 @@
 # Examples
-This directory contains files that have been xor encrypted, and restored by xanal. The encrypted files end with `.enc` and their "cracked" versions enc in `.restored`. This files documents how each file was cracked.
+This directory contains files that have been xor encrypted, and restored by xcrypt. The encrypted files end with `.enc` and their "cracked" versions enc in `.restored`. This files documents how each file was cracked.
 
 ## Test 1
 To solve the first example we use known plaintext because there is not much data.
 ```bash
-xanal -f examples\test1.enc -m 7 crib Congratulations
+xcrypt -f examples\test1.enc -m 7 crib Congratulations
 ```
-We also need to specify a shorter max key length otherwise xanal will guess the key is very long and will say the crib is too short (this will be fixed in later versions xox). We then give the program a crib and a search term (will be changed in he future to just be a single crib). The output is:
+We also need to specify a shorter max key length otherwise xcrypt will guess the key is very long and will say the crib is too short (this will be fixed in later versions xox). We then give the program a crib and a search term (will be changed in he future to just be a single crib). The output is:
 ```
 Key Length Guess: 5
 ------------------------------
@@ -19,7 +19,7 @@ The guessed key length is 5, but the key is just the same character repeated, so
 ## Test 2
 Because there is a lot of data for this test we can just use the most common method:
 ```bash
-xanal -f examples/test2.enc common
+xcrypt -f examples/test2.enc common
 ```
 The output is:
 ```
@@ -33,7 +33,7 @@ Key Guess (hex): 0x746573745f70617373
 ## Test 3
 This is the same decoded data as test2, just encoded with a single byte instead. The command to decode is:
 ```bash
-xanal -f examples/test3.enc common
+xcrypt -f examples/test3.enc common
 ```
 The result is:
 ```
